@@ -1,5 +1,6 @@
-
 class LowPassFilter(object):
+    # Implements a Low Pass Filter to reduce noise
+    
     def __init__(self, tau, ts):
         self.a = 1. / (tau / ts + 1.)
         self.b = tau / ts / (tau / ts + 1.);
