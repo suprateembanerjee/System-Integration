@@ -73,31 +73,38 @@ class DBWTestNode(object):
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.brake_data)
-
+            
+    # DriveByWire Callback, processes Bool messages
     def dbw_enabled_cb(self, msg):
         self.dbw_enabled = msg.data
-
+        
+    # Steering Callback, processed SteeringCmd messages
     def steer_cb(self, msg):
         self.steer = msg.steering_wheel_angle_cmd
 
+    # Throttle Callback, processes ThrottleCmd messages
     def throttle_cb(self, msg):
         self.throttle = msg.pedal_cmd
-
+        
+    # Brake Callback, processes BrakeCmd messages
     def brake_cb(self, msg):
         self.brake = msg.pedal_cmd
-
+        
+    # Ground Truth Steering Callback, processed SteeringCmd messages
     def actual_steer_cb(self, msg):
         if self.dbw_enabled and self.steer is not None:
             self.steer_data.append({'actual': msg.steering_wheel_angle_cmd,
                                     'proposed': self.steer})
             self.steer = None
-
+    
+    # Ground Truth Throttle Callback, processes ThrottleCmd messages
     def actual_throttle_cb(self, msg):
         if self.dbw_enabled and self.throttle is not None:
             self.throttle_data.append({'actual': msg.pedal_cmd,
                                        'proposed': self.throttle})
             self.throttle = None
-
+    
+    # Ground Truth Brake Callback, processes BrakeCmd messages
     def actual_brake_cb(self, msg):
         if self.dbw_enabled and self.brake is not None:
             self.brake_data.append({'actual': msg.pedal_cmd,
