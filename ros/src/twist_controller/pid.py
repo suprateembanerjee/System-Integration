@@ -1,9 +1,11 @@
-
+# Constants
 MIN_NUM = float('-inf')
 MAX_NUM = float('inf')
 
 
 class PID(object):
+    # Implements a PID Controller
+    
     def __init__(self, kp, ki, kd, mn=MIN_NUM, mx=MAX_NUM):
         self.kp = kp
         self.ki = ki
@@ -16,6 +18,7 @@ class PID(object):
     def reset(self):
         self.int_val = 0.0
 
+    # Calculate PID update through a timestep
     def step(self, error, sample_time):
 
         integral = self.int_val + error * sample_time;
