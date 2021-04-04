@@ -12,9 +12,12 @@ import cv2
 import yaml
 from scipy.spatial import KDTree
 
+# Number of frames where a certain light needs to be detected to be sure it is valid
 STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
+    
+    # Detects Traffic Light by subscribing to a ROS Topic
     def __init__(self):
         rospy.init_node('tl_detector')
 
@@ -24,19 +27,21 @@ class TLDetector(object):
         self.lights = []
         self.waypoints2D = None
         self.waypoint_tree = None
-
+        
+        # Subscribers
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
         '''
-        /vehicle/traffic_lights provides you with the location of the traffic light in 3D map space and
-        helps you acquire an accurate ground truth data source for the traffic light
+        /vehicle/traffic_lights provides the location of the traffic light in 3D map space and
+        helps acquire an accurate ground truth data source for the traffic light
         classifier by sending the current color state of all traffic lights in the
         simulator. When testing on the vehicle, the color state will not be available. You'll need to
         rely on the position of the light and the camera image to predict it.
         '''
-        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -53,20 +58,22 @@ class TLDetector(object):
         self.state_count = 0
 
         rospy.spin()
-
+    
+    # Pose Callback, processes PoseStamped messages
     def pose_cb(self, msg):
         self.pose = msg
-
+    
+    # Waypoint Callback, processes Lane messages
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints
         if not self.waypoints2D:
             self.waypoints2D = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
             self.waypoint_tree = KDTree(self.waypoints2D)
-
+    
+    # Traffic Light Callback, processes TrafficLightArray messages
     def traffic_cb(self, msg):
         self.lights = msg.lights
-        print("[tl_detector]Checkpoint 1: self.lights initialized")
-
+        
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
             of the waypoint closest to the red light's stop line to /traffic_waypoint
@@ -89,7 +96,6 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
-        print("[tl_detector]Checkpoint 5: Returned to image_cb()")
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -98,23 +104,20 @@ class TLDetector(object):
         used.
         '''
         if self.state != state:
-            print("[tl_detector]Checkpoint 6.1: self.state != state.\n self.state : {}\nstate: {}\n".format(self.state, state))
             self.state_count = 0
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
-            print("[tl_detector]Checkpoint 6.2: self.state_count >= STATE_COUNT_THRESHOLD.\n self.state : {}\nstate: {}\nself.state_count: {}\n".format(self.state, state, self.state_count))
             self.last_state = self.state
             light_wp = light_wp if state == TrafficLight.RED else -1
             self.last_wp = light_wp
             self.upcoming_red_light_pub.publish(Int32(light_wp))
         else:
-            print("[tl_detector]Checkpoint 6.3: No conditions matched.\n self.state : {}\nstate: {}\n".format(self.state, state))
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+            
         self.state_count += 1
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
-            https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
             pose (Pose): position to match a waypoint to
 
@@ -122,7 +125,7 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
+        # Query the KDTree to find closest waypoint
         return self.waypoint_tree.query([x, y], 1)[1]
 
     def get_light_state(self, light):
@@ -148,8 +151,7 @@ class TLDetector(object):
         """
 
     def process_traffic_lights(self):
-        """Finds closest visible traffic light, if one exists, and determines its
-            location and color
+        """Finds closest visible traffic light, if one exists, and determines its location and color
 
         Returns:
             int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
@@ -162,12 +164,11 @@ class TLDetector(object):
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
-        print("[tl_detector]Checkpoint 2: At process_traffic_lights()")
+        
         if(self.pose):
-            print("[tl_detector]Checkpoint 3: self.pose checked")
             car_wp_i = self.get_closest_waypoint(self.pose.pose.position.x, self.pose.pose.position.y)
 
-            #TODO find the closest visible traffic light (if one exists)
+            # Find the closest visible traffic light (if one exists)
             diff = len(self.waypoints.waypoints)
 
             for i, light in enumerate(self.lights):
@@ -182,12 +183,9 @@ class TLDetector(object):
                     line_wp_i = temp_wp_i
 
         if closest_tl:
-            print("[tl_detector]Checkpoint 4.1: Closest_tl is not None. Returning State.")
             state = self.get_light_state(closest_tl)
             return line_wp_i, state
 
-        #self.waypoints = None
-        print("[tl_detector]Checkpoint 4.2: Closest_tl is None, returning Unknown")
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
